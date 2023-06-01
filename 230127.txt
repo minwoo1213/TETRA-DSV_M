@@ -1,1 +1,0 @@
-git checkout 'git tag | sort -V | grep -P "^2.\d+\.\d+" | tail -1'
