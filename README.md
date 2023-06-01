@@ -1,9 +1,7 @@
 # minwoo_1213
 
-/*   Hyulimnetworks_company
-     TETRA-DSV ROS Developer
-     TETRA-DSV version 230601
-     Update by ... mwcha_230601 */
+/*   Hyulimnetworks_company TETRA-DSV ROS Developer -
+     TETRA-DSV version 230601 / Update by ... mwcha_230601 */
 
 
 
