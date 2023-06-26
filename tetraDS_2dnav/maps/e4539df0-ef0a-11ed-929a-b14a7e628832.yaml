@@ -1,0 +1,7 @@
+image: e4539df0-ef0a-11ed-929a-b14a7e628832.pgm
+resolution: 0.050000
+origin: [-20.380757, -27.206140, 0.000000]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196
+
