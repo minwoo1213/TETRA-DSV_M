@@ -1,7 +1,8 @@
 ////TETRA_DS Service ROS Package_Ver 0.1
+// NEW _ M model of TETRA-DSV Version_230810 mwcha  //
 #include <ros/ros.h>
-#include <ros/master.h>
-#include <ros/this_node.h>
+#include <ros/master.h> // add_move_base die check
+#include <ros/this_node.h> // add_move_base die check
 #include <tf/tf.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
@@ -26,7 +27,6 @@
 #include <std_msgs/Float32.h>
 #include <std_msgs/Float64.h>
 #include <std_msgs/Empty.h>
-#include <std_srvs/SetBool.h> //add...cygbot Local costmap toggle_enabled
 #include <std_msgs/Header.h>
 #include <std_srvs/Empty.h>
 #include <sensor_msgs/LaserScan.h>
@@ -127,7 +127,7 @@
 #include "tetraDS_service/power_sonar_cmd.h" //SRV
 
 #define LOW_BATTERY 15
-#define MAX_RETRY_CNT 99 //23.03.08_update by mwcha
+#define MAX_RETRY_CNT 999
 #define BUF_LEN 4096
 using namespace std;
 std::string tf_prefix_;
@@ -182,10 +182,6 @@ bool m_flag_setgoal = false;
 //flag
 bool m_flag_PREEMPTED = false;
 
-//Cygbot local costmap toggle_enabled flag//
-bool m_bToggle_enabled_flag1 = false;
-bool m_bToggle_enabled_flag2 = false;
-
 
 typedef struct HOME_POSE
 {
@@ -231,8 +227,6 @@ typedef struct FALG_VALUE
     //PCL obstacle Check//
     bool m_bFlag_Obstacle_PCL1 = false;
     bool m_bFlag_Obstacle_PCL2 = false;
-    //Cygbot Check//
-    bool m_bFlag_Obstacle_cygbot = false;
     //Error Flag//
     bool m_bumperhit_flag = false;
     bool m_emgpush_flag = false;
@@ -546,10 +540,6 @@ geometry_msgs::PoseWithCovarianceStamped set_pose;
 ros::ServiceClient power_sonar_cmd_client;
 tetraDS_service::power_sonar_cmd Power_sonar_srv;
 
-//local_costmap toggle_enabled Service Client//
-ros::ServiceClient toggle_enabled_client;
-std_srvs::SetBool toggle_enabled;
-
 //Bumper_data to Pointcloud2_data//
 ros::Publisher  pointcloud_pub_;
 sensor_msgs::PointCloud2 pointcloud_;
@@ -648,7 +638,7 @@ void LaserScanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
     int C_minIndex = 320; //180;
     int C_maxIndex = 420; //550;
     int C_closestIndex = -1;
-    double C_minVal = 0.5; //0.8
+    double C_minVal = 0.8; //0.3
 
     for (int i = C_minIndex; i < C_maxIndex; i++)
     {
@@ -734,31 +724,6 @@ void PCL2_Callback(const sensor_msgs::LaserScan::ConstPtr &msg)
         _pFlag_Value.m_bFlag_Obstacle_PCL2 = true;
     else
         _pFlag_Value.m_bFlag_Obstacle_PCL2 = false;
-}
-
-void Cygbot_Callback(const sensor_msgs::LaserScan::ConstPtr &msg)
-{
-    int size = msg->ranges.size();
-    //printf("cygbot_size: %d \n",size);
-    int cygbot_minIndex = 1;
-    int cygbot_maxIndex = 160;
-    int cygbot_closestIndex = -1;
-    double cygbot_minVal = 0.5;
-
-    for (int i = cygbot_minIndex; i < cygbot_maxIndex; i++)
-    {
-        if ((msg->ranges[i] <= cygbot_minVal) && (msg->ranges[i] >= msg->range_min) && (msg->ranges[i] <= msg->range_max))
-        {
-            cygbot_minVal = msg->ranges[i];
-            cygbot_closestIndex = i;
-        }
-    }
-    //printf("cygbot_closestIndex: %d || check: %f \n" , cygbot_closestIndex, msg->ranges[cygbot_closestIndex]);
-    if(cygbot_closestIndex > 0)
-        _pFlag_Value.m_bFlag_Obstacle_cygbot = true;
-    else
-        _pFlag_Value.m_bFlag_Obstacle_cygbot = false;
-    
 }
 
 double Quaternion2Yaw(double Quaternion_W, double Quaternion_X, double Quaternion_Y, double Quaternion_Z)
@@ -1030,30 +995,6 @@ void cmd_vel_Callback(const geometry_msgs::Twist::ConstPtr& msg)
 {
     _pDynamic_param.m_linear_vel  = msg->linear.x;
     _pDynamic_param.m_angular_vel = msg->angular.z;
-
-    if(_pDynamic_param.m_linear_vel < 0)
-    {
-        if(!m_bToggle_enabled_flag1)
-        {
-            toggle_enabled.request.data = true;
-            toggle_enabled_client.call(toggle_enabled);
-            printf("toggle_Enable !\n");
-            m_bToggle_enabled_flag1 = true;
-            m_bToggle_enabled_flag2 = false;
-        }
-        
-    }
-    else
-    {
-        if(!m_bToggle_enabled_flag2)
-        {
-            toggle_enabled.request.data = false;
-            toggle_enabled_client.call(toggle_enabled);
-            printf("toggle_Disable !\n");
-            m_bToggle_enabled_flag1 = false;
-            m_bToggle_enabled_flag2 = true;
-        }
-    }
 
 }
 
@@ -1942,7 +1883,7 @@ bool Virtual_Obstacle_Command(tetraDS_service::virtual_obstacle::Request &req,
 
 	}
 
-	if(m_bFlag_nomotion_call || !_pFlag_Value.m_bFlag_nomotion || m_flag_Dynamic_reconfigure_call || m_flag_setgoal || m_flag_PREEMPTED || _pFlag_Value.m_bTebMarker_reconfigure_flag)
+	if(m_bFlag_nomotion_call || !_pFlag_Value.m_bFlag_nomotion || m_flag_Dynamic_reconfigure_call || m_flag_setgoal || _pFlag_Value.m_bTebMarker_reconfigure_flag)
 	{
 		bResult = false;
 		res.command_Result = bResult;
@@ -2368,7 +2309,7 @@ void BumperCallback(const std_msgs::Int32::ConstPtr& msg)
 {
     _pRobot_Status.m_iCallback_Bumper = msg->data;
 
-    if(_pRobot_Status.m_iCallback_Bumper != 0)
+    if(_pRobot_Status.m_iCallback_Bumper == 1)
     {
         memcpy(&pointcloud_.data[0 * pointcloud_.point_step + pointcloud_.fields[0].offset], &p_side_x_, sizeof(float));
         memcpy(&pointcloud_.data[0 * pointcloud_.point_step + pointcloud_.fields[1].offset], &p_side_y_, sizeof(float));
@@ -2397,7 +2338,11 @@ void BumperCallback(const std_msgs::Int32::ConstPtr& msg)
         }
         _pFlag_Value.m_bumperhit_flag = true;
     }
-    else
+    else if(_pRobot_Status.m_iCallback_Bumper == 2 || _pRobot_Status.m_iCallback_Bumper == 3)
+    {
+        printf("[Switch] Push Servo Switch Button !! \n");
+    }
+    else // 230629 ... update loop by mwcha
     { 
         memcpy(&pointcloud_.data[0 * pointcloud_.point_step + pointcloud_.fields[0].offset], &P_INF_X, sizeof(float));
         memcpy(&pointcloud_.data[0 * pointcloud_.point_step + pointcloud_.fields[1].offset], &P_INF_Y, sizeof(float));
@@ -2640,6 +2585,8 @@ void resultCallback(const move_base_msgs::MoveBaseActionResult::ConstPtr& msgRes
     //clear_costmap_client.call(m_request);
   }
 }
+
+// add Move_base Die Check
 bool checkNode(std::string& node_name)
 {
     geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
@@ -2657,7 +2604,6 @@ bool checkNode(std::string& node_name)
     cmd->angular.z = 0.0;
     cmdpub_.publish(cmd);
     _pFlag_Value.m_bFlag_pub = true;
-    //setGoal(goal);
     return false;
 }
 
@@ -2691,7 +2637,8 @@ void statusCallback(const actionlib_msgs::GoalStatusArray::ConstPtr &msgStatus)
             cmd->angular.z = 0.0;
             cmdpub_.publish(cmd);
             //Retry setGoal..
-            if(_pGoal_pose.goal_positionX != 0.0 && _pGoal_pose.goal_positionY != 0.0){
+            if(_pGoal_pose.goal_positionX != 0.0 && _pGoal_pose.goal_positionY != 0.0)
+            {
                 setGoal(goal);
             }
             printf("setGoal call: %.5f, %.5f !!\n", _pGoal_pose.goal_positionX, _pGoal_pose.goal_positionY);
@@ -2905,7 +2852,7 @@ bool BumperCollision_Behavior()
     }
     else
     {
-        if(_pFlag_Value.m_bFlag_Obstacle_cygbot)
+        if((m_Ultrasonic_RL_Range <= 0.2) || (m_Ultrasonic_RR_Range <= 0.2))
         {
             cmd->linear.x =  0.0; 
             cmd->angular.z = 0.0;
@@ -3952,11 +3899,18 @@ void *AutoThread_function(void *data)
                 OpenLocationFile(arr_patrol_location[i]);
                 if(_pRobot_Status.m_iCallback_Charging_status <= 1) //Nomal
                 {
+                    clear_costmap_client.call(m_request);
                     setGoal(goal);
                 }
                 else //Docking check...
                 {
                     ex_iDocking_CommandMode = 10; //Depart Move
+                    while(ex_iDocking_CommandMode != 0)
+                    {
+                        sleep(1); //1 sec
+                        ROS_INFO("Depart_Station2Move....");
+                    }
+
                 }
 
                 ROS_INFO("[patrol]: goto_ %s", arr_patrol_location[i].c_str());
@@ -4385,8 +4339,6 @@ int main (int argc, char** argv)
     //Depthimage to scan subscriber//
     ros::Subscriber pcl1_sub = nh.subscribe("pcl_1", 100, PCL1_Callback);
     ros::Subscriber pcl2_sub = nh.subscribe("pcl_2", 100, PCL2_Callback);
-    //Cygbot LiDARto scan subscriber//
-    ros::Subscriber cygbot_sub = nh.subscribe("scan_laser", 100, Cygbot_Callback); //Rear Cygbot LiDAR
     //virtual costmap
     virtual_obstacle_pub = nh.advertise<virtual_costmap_layer::Obstacles>("virtual_costamp_layer/obsctacles", 100);
     virtual_obstacle2_pub = nh.advertise<virtual_costmap_layer2::Obstacles2>("virtual_costamp_layer2/obsctacles", 100);
@@ -4492,8 +4444,6 @@ int main (int argc, char** argv)
     SetPose_cmd_client = client_h.serviceClient<tetraDS_service::SetPose>("set_pose");
     //sonar sensor on/off
     power_sonar_cmd_client = client_h.serviceClient<tetraDS_service::power_sonar_cmd>("Power_sonar_start_cmd");
-    //cygbot_mark toggle_enabled Service Client//
-    toggle_enabled_client = client_h.serviceClient<std_srvs::SetBool>("move_base/local_costmap/cygbot_obstacle_layer/cygbot_mark/toggle_enabled");
 
     //Infomation_subscriber//
     ros::NodeHandle nInfo;
@@ -4591,19 +4541,21 @@ int main (int argc, char** argv)
     printf("HOME_dQUATERNION_Z: %f \n", _pHomePose.HOME_dQUATERNION_Z);
     printf("HOME_dQUATERNION_W: %f \n", _pHomePose.HOME_dQUATERNION_W);
     
-    //230113 test
-    std::string node_name = "/" + tf_prefix_ + "/move_base";
-
+    std::string node_name = "/" + tf_prefix_ + "/move_base"; // add move_base Die Check node_name
     while(ros::ok())
     {
         ros::spinOnce();
-        nh.getParam("active_map",m_bActive_map_check);
-        if(m_bActive_map_check){
-            if(checkNode(node_name) == true){
+	    
+        // add move_base Die Check Loop
+        nh.getParam("active_map", m_bActive_map_check);
+        if(m_bActive_map_check)
+        {
+            if(checkNode(node_name) == true)
+            {
                 // ROS_ERROR("move_base alive");
-                _pFlag_Value.m_bFlag_pub = false;
             }   
-            else{
+            else
+            {
                 // ROS_ERROR("move_base die");
             }
         }
@@ -4733,7 +4685,7 @@ int main (int argc, char** argv)
                     m_iList_Count = virtual_obstacle.list.size();
                     if(m_iList_Count > 0)
                     {
-                        if(m_bFlag_nomotion_call || !_pFlag_Value.m_bFlag_nomotion || m_flag_Dynamic_reconfigure_call || m_flag_setgoal || m_flag_PREEMPTED || _pFlag_Value.m_bTebMarker_reconfigure_flag)
+                        if(m_bFlag_nomotion_call || !_pFlag_Value.m_bFlag_nomotion || m_flag_Dynamic_reconfigure_call || m_flag_setgoal || _pFlag_Value.m_bTebMarker_reconfigure_flag)
                         {
                             loop_rate.sleep();
                             continue;
@@ -4761,7 +4713,7 @@ int main (int argc, char** argv)
                                     }
                                 }
                             }
-                            if(m_bFlag_nomotion_call || !_pFlag_Value.m_bFlag_nomotion || m_flag_Dynamic_reconfigure_call || m_flag_setgoal || m_flag_PREEMPTED || _pFlag_Value.m_bTebMarker_reconfigure_flag)
+                            if(m_bFlag_nomotion_call || !_pFlag_Value.m_bFlag_nomotion || m_flag_Dynamic_reconfigure_call || m_flag_setgoal || _pFlag_Value.m_bTebMarker_reconfigure_flag)
                             {
                                 loop_rate.sleep();
                                 continue;
