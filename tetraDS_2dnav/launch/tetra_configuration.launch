@@ -11,6 +11,7 @@
   <param name="active_map" type="bool" value="false" />
 
 <group if="$(eval arg('ekf_option_flag')==1)">
+
 <!-- ekf_localization -->
   <node pkg="robot_localization" type="ekf_localization_node" name="ekf_localization" clear_params="true"> 
     <rosparam command="load" file="$(find tetraDS_2dnav)/config/ekf_localization.yaml" />
@@ -25,8 +26,8 @@
 
  <!-- 2D LiDAR  SICK TIM571-->
   <node name="sick_tim571_2050101" pkg="sick_tim" type="sick_tim551_2050001" respawn="false" output="screen">
-      <param name="min_ang" type="double" value="-2.35619" /> <!--124deg--> # -2.16421_230206_mwcha
-      <param name="max_ang" type="double" value="2.35619" />  <!--124deg--> # 2.16421_230206_mwcha
+      <param name="min_ang" type="double" value="-2.16421" /> <!--124deg-->
+      <param name="max_ang" type="double" value="2.16421" />  <!--124deg-->
       <param name="intensity" type="bool" value="True" />
       <param name="skip" type="int" value="0" />
       <param name="frame_id" type="str" value="$(optenv ROS_NAMESPACE)/laser" />
@@ -87,11 +88,11 @@
     </node>
 
 <!--realsense_Point Cloud data -->
-  <include file = "$(find realsense2_camera)/launch/rs_pointcloud_r.launch"/>
-//remove beacuse realsense_cam_single_version
-  <!--<include file="$(find tetraDS_2dnav)/launch/DepthimageToScan.launch"/>-->
+  <include file = "$(find realsense2_camera)/launch/rs_pointcloud_f.launch"/>
+  <!--<include file = "$(find tetraDS_2dnav)/launch/timed_rgbd.launch"/>
+  <include file="$(find tetraDS_2dnav)/launch/DepthimageToScan.launch"/>-->
 
-<!--Cygbot LiDAR -->
+<!--Cygbot LiDAR-->
   <node pkg="cyglidar_d1" type="cyglidar_pcl_publisher" name="line_laser" output="screen">
     <param name="port" value="/dev/cyglidar"/>
     <param name="baud_rate" value="3000000"/>
@@ -103,11 +104,13 @@
     <param name="duration" value="10000"/>
   </node>
 
+<node pkg="tf2_web_republisher" type="tf2_web_republisher" name="tf2_web_republisher" output="screen" />
+<include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch" ></include>
 
-<node pkg="tf2_web_republisher" type="tf2_web_republisher" name="tf2_web_republisher" outpu="screen"/>
+<!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find tetraDS_2dnav)/view_navigation.rviz" /> -->
 
-<include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch"></include>
 <node pkg="tetraDS_TCP" type="tetraDS_TCP" name="tetraDS_TCP" output="screen" args="5100" />
+  
 </launch>
 
 
