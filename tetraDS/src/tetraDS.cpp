@@ -30,8 +30,8 @@ extern "C"
 #include <unistd.h>
 using namespace std;
 
-#define WHEEL_RADIUS 0.1018 //m
-#define WHEEL_DISTANCE 0.4380 //m
+#define WHEEL_RADIUS 0.1027 //m
+#define WHEEL_DISTANCE 0.4396 //m ... update by mwcha_230810
 #define TREAD_WIDTH 0.04 //m
 
 //serial
@@ -552,6 +552,8 @@ int main(int argc, char * argv[])
 	usleep(10000);
 	//emg flag//
 	bool m_bflag_emg = false;
+	//bumper flag ... add by mwcha
+	bool m_bflag_bumper = false;
 	//
 	printf("□■■■■■■■□■■■■■■□□■■■■■■■□■■■■■■□□□□□□■□□□□\n");
 	printf("□□□□■□□□□■□□□□□□□□□□■□□□□■□□□□□■□□□□□■□□□□\n");
@@ -656,6 +658,7 @@ int main(int argc, char * argv[])
 			dssp_rs232_drv_module_set_servo(1); //Servo On
 		}
 
+/*
 		if(m_emg_state)
 		{
 			if(m_bflag_emg)
@@ -675,11 +678,33 @@ int main(int argc, char * argv[])
 				m_bflag_emg = true;
 			}
 		}
+*/
+		if(m_bumper_data == 2 || m_bumper_data == 3) //Switch and Bumper Loop ... 230629 add by mwcha
+		{
+			if(m_bflag_bumper)
+			{
+				printf("!! SERVO OFF !! \n");
+				dssp_rs232_drv_module_set_servo(0); //Servo Off
+				usleep(1000);
+				dssp_rs232_drv_module_set_drive_err_reset();
+				usleep(1000);
+				m_bflag_bumper = false;
+			}
+		}
+		else
+		{
+			if(!m_bflag_bumper)
+			{
+				printf("!! SERVO ON !! \n");
+				dssp_rs232_drv_module_set_servo(1); //Servo On
+				m_bflag_bumper = true;
+			}
+		}
 
 		tetra.read();
 		loop_rate.sleep();
     }
-
+	
 	//Servo Off
 	dssp_rs232_drv_module_set_servo(0);
 	printf("Servo Off \n");
