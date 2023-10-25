@@ -1,7 +1,7 @@
 # minwoo_exfp
 
 /*   Hyulimnetworks_company TETRA-DSV ROS Dev -
-     TETRA-DSV-M version 230919 / Update by ... mwcha_230919 */
+     TETRA-DSV-M version 231025 */
 
      
 tetraDS : TETRA구동 보드와의 Serial통신을 통하여 Motor의 구동을 담당하는 패키지 (RS232통신 사용)
