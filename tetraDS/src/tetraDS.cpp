@@ -31,7 +31,7 @@ extern "C"
 using namespace std;
 
 #define WHEEL_RADIUS 0.1027 //m
-#define WHEEL_DISTANCE 0.4396 //m ... update by mwcha_230810
+#define WHEEL_DISTANCE 0.4420 //m ... update by mwcha_231031
 #define TREAD_WIDTH 0.04 //m
 
 //serial
