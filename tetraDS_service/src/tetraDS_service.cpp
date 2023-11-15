@@ -170,6 +170,8 @@ int m_iViaPoint_Index = 0;
 bool m_bFlag_nomotion_call = false;
 //clesr_costmap service call...
 bool m_flag_clesr_costmap_call = false;
+//virtualWallCheck ... 231115 add
+bool m_bFlag_virtualWallCheck = true;
 //Dynamic_reconfigure call flag//
 bool m_flag_Dynamic_reconfigure_call = false;
 bool m_flag_Dynamic_TebMarkers_major_update = false;
@@ -1891,7 +1893,11 @@ bool Virtual_Obstacle_Command(tetraDS_service::virtual_obstacle::Request &req,
 		return true;
 	}
 	virtual_obstacle_pub.publish(virtual_obstacle);
- 
+        // 231115 add
+    	if(virtual_obstacle.list.size() != 0 )
+    	{
+            m_bFlag_virtualWallCheck = true;
+    	}
 	/*
 	int32[]  list_count
 	float64[] form_x
@@ -4719,7 +4725,10 @@ int main (int argc, char** argv)
                                 continue;
                             }
                             virtual_obstacle2_pub.publish(virtual_obstacle2);
-                        }
+			    // 231115 add
+                            if(m_iList_Count2 == 0){
+                                m_bFlag_virtualWallCheck = false;
+                            }
 
                     }
                 }
