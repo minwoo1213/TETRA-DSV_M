@@ -25,6 +25,7 @@ add_service_files(
   dockingcontrol.srv
   getlocationlist.srv
   deletelocation.srv
+  deletemap.srv
   runmapping.srv
   runnavigation.srv
   rosnodekill.srv

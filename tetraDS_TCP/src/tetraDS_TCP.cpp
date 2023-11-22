@@ -57,6 +57,7 @@
 #include "tetraDS_TCP/setsavemap.h" //SRV
 #include "tetraDS_TCP/getlocationlist.h" //SRV
 #include "tetraDS_TCP/deletelocation.h" //SRV
+#include "tetraDS_TCP/deletemap.h" //SRV    
 #include "tetraDS_TCP/runmapping.h" //SRV
 #include "tetraDS_TCP/runnavigation.h" //SRV
 #include "tetraDS_TCP/rosnodekill.h" //SRV
@@ -125,6 +126,8 @@ ros::ServiceClient mapping_cmd_client;
 tetraDS_TCP::runmapping mapping_cmd_service;
 ros::ServiceClient mapsave_cmd_client;
 tetraDS_TCP::setsavemap mapsave_cmd_service;
+ros::ServiceClient deletemap_cmd_client; //add 231120 mwcha
+tetraDS_TCP::deletemap deletemap_cmd_service; //add 231120 mwcha
 ros::ServiceClient nodekill_cmd_client;
 tetraDS_TCP::rosnodekill nodekill_cmd_service;
 ros::ServiceClient deletelocation_cmd_client;
@@ -245,6 +248,7 @@ void resultCallback(const move_base_msgs::MoveBaseActionResult::ConstPtr& msgRes
     // curr_time = time(NULL);
     // curr_tm = localtime(&curr_time);
     _pRobot_Status.iMovebase_Result = msgResult->status.status;
+    printf("_pRobot_Status.iMovebase_Result : %d \n", _pRobot_Status.iMovebase_Result);
     ROS_INFO("[SUCCEEDED]resultCallback: %d ",msgResult->status.status);
    
 }
@@ -456,6 +460,31 @@ bool Set_Location(string strLocationName)
     return bResult;
 }
 
+bool Delete_Location(string strLocationName) //add by mwcha 231120
+{
+    bool bResult = false;
+
+    deletelocation_cmd_service.request.Location = strLocationName;
+    deletelocation_cmd_client.call(deletelocation_cmd_service);
+
+    sprintf(Send_buffer,"DS,2,LDL,%s,XX", strLocationName.c_str());
+
+    bResult = true;
+    return bResult;
+}
+bool Delete_Map(string strMapName) //add by mwcha 231120
+{
+    bool bResult = false;
+
+    deletemap_cmd_service.request.map_name = strMapName;
+    deletemap_cmd_client.call(deletemap_cmd_service);
+
+    sprintf(Send_buffer,"DS,2,MDL,%s,XX", strMapName.c_str());
+
+    bResult = true;
+    return bResult;
+}
+
 bool Set_Output(int Output0, int Output1, int Output2, int Output3, int Output4, int Output5, int Output6, int Output7)
 {
     bool bResult = false;
@@ -525,7 +554,7 @@ bool NodeKill()
     nodekill_cmd_client.call(nodekill_cmd_service);
 
     bResult = true;
-    return bResult;
+    return bResult;   
 }
 
 bool Map_Save(string strMapName)
@@ -639,8 +668,10 @@ bool DoParsing(char* data)
                 break;
             case HashCode("KILL"): //Mapping Mode or Navigation Mode Kill Service Call
                 NodeKill();
+                sprintf(Send_buffer, " MAPPING / NAV MODE EXIT "); //add by mwcha ... 231115
                 break;
             case HashCode("DOC"): // Docking command
+                _pRobot_Status.iMovebase_Result = 0;
                 Dcoking_Control(atoi(m_cPARAM[0]), atoi(m_cPARAM[1]));
                 break;
             case HashCode("GO1"): // Move to saved location 
@@ -659,6 +690,12 @@ bool DoParsing(char* data)
                 break;
             case HashCode("LSV"): // Save to Location data
                 Set_Location(m_cPARAM[0]);
+                break;
+            case HashCode("LDL"): // delete to Location data ... 231120 mwcha
+                Delete_Location(m_cPARAM[0]);
+                break;
+            case HashCode("MDL"): // delete to Map data ... 231120 mwcha
+                Delete_Map(m_cPARAM[0]);
                 break;
             case HashCode("OUT"): // GPIO_Output command
                 Set_Output(atoi(m_cPARAM[0]),atoi(m_cPARAM[1]),atoi(m_cPARAM[2]),atoi(m_cPARAM[3]),
@@ -790,6 +827,7 @@ int main(int argc, char* argv[])
     mapsave_cmd_client = client_h.serviceClient<tetraDS_TCP::setsavemap>("savemap_cmd");
     nodekill_cmd_client = client_h.serviceClient<tetraDS_TCP::rosnodekill>("nodekill_cmd");
     deletelocation_cmd_client = client_h.serviceClient<tetraDS_TCP::deletelocation>("delete_location_cmd");
+    deletemap_cmd_client = client_h.serviceClient<tetraDS_TCP::deletemap>("deletemap_cmd"); //add 231120 mwcha
     dockingcontrol_cmd_client = client_h.serviceClient<tetraDS_TCP::dockingcontrol>("docking_cmd");
     output_cmd_client = client_h.serviceClient<tetraDS_TCP::power_set_outport>("Power_outport_cmd");
     gpio_status_cmd_client = client_h.serviceClient<tetraDS_TCP::power_get_io_status>("Power_io_status_cmd");
