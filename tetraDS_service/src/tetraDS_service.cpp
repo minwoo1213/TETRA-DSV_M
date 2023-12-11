@@ -1412,7 +1412,7 @@ bool Goto_Command2(tetraDS_service::gotolocation2::Request &req,
 	LED_Toggle_Control(1, 3,100,3,1);
 	LED_Turn_On(63);
 
-	if(_pRobot_Status.m_iCallback_Charging_status <= 1 && (_pAR_tag_pose.m_iAR_tag_id == -1 || _pAR_tag_pose.m_transform_pose_x >= 0.4))) //Nomal
+	if(_pRobot_Status.m_iCallback_Charging_status <= 1 && (_pAR_tag_pose.m_iAR_tag_id == -1 || _pAR_tag_pose.m_transform_pose_x >= 0.4)) //Nomal
 	{
 		setGoal(goal);
 		bResult = true;
