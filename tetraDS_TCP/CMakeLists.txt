@@ -35,6 +35,7 @@ add_service_files(
   power_set_outport.srv
   power_get_io_status.srv
   power_set_single_outport.srv
+  manual_backmove.srv
 )
 
 generate_messages(   
