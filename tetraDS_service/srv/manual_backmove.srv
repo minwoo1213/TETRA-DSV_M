@@ -1,0 +1,7 @@
+#This message is used to send command to tetra
+# manual backmove Command
+
+float64 cmd_vel
+float64 move_distance
+---
+bool command_Result
