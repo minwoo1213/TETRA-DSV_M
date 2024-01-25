@@ -83,6 +83,11 @@ tetraDS::angular_position_move angular_move_cmd;
 bool m_bEKF_option = false;
 bool m_bForwardCheck = false;
 
+//add ... 240125 mwcha
+double ex_dBefore_Position_x = 0.0;
+double ex_dBefore_Position_y = 0.0;
+double ex_dIncrement_Distance = 0.0;
+double ex_dTotal_Distance = 0.0;
 
 class TETRA
 {
@@ -514,6 +519,11 @@ int main(int argc, char * argv[])
 	right_error_code_publisher = nemg.advertise<std_msgs::Int32>("right_error_code", 1);
 	std_msgs::Int32 right_error_code;
 
+	//add ... Total Distace ... 240125 mwcha
+	ros::Publisher total_distance_publisher;
+	total_distance_publisher = nemg.advertise<std_msgs::Float32>("total_distance", 1);
+	std_msgs::Float32 total_distance;
+	
 	//tetraDS_service
 	parameter_read_service  = param.advertiseService("param_read_cmd", Parameter_Read_Command);
 	parameter_write_service = param.advertiseService("param_write_cmd", Parameter_Write_Command);
@@ -636,12 +646,21 @@ int main(int argc, char * argv[])
 		right_error_code.data = m_right_error_code;
 		right_error_code_publisher.publish(right_error_code);
 
-		//odometry calback//
+		//odometry callback//
 		dssp_rs232_drv_module_read_odometry(&m_dX_pos, &m_dY_pos, &m_dTheta);
 		tetra.coordinates[0] = (m_dX_pos /1000.0);
 		tetra.coordinates[1] = (m_dY_pos /1000.0);
 		tetra.coordinates[2] = m_dTheta * (M_PI/1800.0);
 
+		//add ... Distance calc ... 240125 mwcha
+        	ex_dIncrement_Distance = sqrt(((tetra.coordinates[0] - ex_dBefore_Position_x)*(tetra.coordinates[0] - ex_dBefore_Position_x))+((tetra.coordinates[1] - ex_dBefore_Position_y)*(tetra.coordinates[1] - ex_dBefore_Position_y)));
+        	ex_dTotal_Distance = ex_dTotal_Distance + ex_dIncrement_Distance;                    
+        	ex_dBefore_Position_x = tetra.coordinates[0];
+        	ex_dBefore_Position_y = tetra.coordinates[1];
+		// total Distance pub
+		total_distance.data = ex_dTotal_Distance;
+		total_distance_publisher.publish(total_distance);
+		
 		if(!bPosition_mode_flag) //Velocity mode only
 		{
 			SetMoveCommand(control_linear, control_angular);
