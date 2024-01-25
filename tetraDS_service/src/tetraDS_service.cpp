@@ -125,6 +125,8 @@
 #include "tetraDS_service/setekf.h"
 //SONAR Sensor On/Off
 #include "tetraDS_service/power_sonar_cmd.h" //SRV
+//add... manual backmove Service//
+#include "tetraDS_service/manual_backmove.h" //SRV ... 240125
 
 #define LOW_BATTERY 15
 #define MAX_RETRY_CNT 999
@@ -507,6 +509,9 @@ ros::ServiceServer deletedataall_service;
 //Set EKF & IMU Reset Service//
 tetraDS_service::setekf set_ekf_cmd;
 ros::ServiceServer set_ekf_service;
+//add... Manual backmove Service//
+tetraDS_service::manual_backmove manual_backmove_cmd;
+ros::ServiceServer manual_backmove_service; //240125
 
 //**Command srv _ Service Client************************/
 //Usb_cam Service Client//
@@ -1964,6 +1969,23 @@ bool Patrol_Conveyor_Command(tetraDS_service::patrol_conveyor::Request &req,
 	return true;
 }
 
+//add.. Manual_Backmove_Command ... 240125
+bool Manual_Backmove_Command(tetraDS_service::manual_backmove::Request &req, 
+				             tetraDS_service::manual_backmove::Response &res)
+{
+    //printf("Call Manual_Backmove_Command Service !! \n");
+	bool bResult = false;
+
+    _pRobot_Status.m_cmd_vel = req.cmd_vel;
+    _pRobot_Status.m_backmove_cmd = req.move_distance;
+    _pRobot_Status.m_dGoal_Distance = _pRobot_Status.m_backmove_cmd + _pRobot_Status.m_dTotal_Distance;
+    ex_iDocking_CommandMode = 200;
+
+	bResult = true;
+	res.command_Result = bResult;
+	return true;
+
+}
 
 void Reset_EKF_SetPose()
 {
@@ -4426,6 +4448,8 @@ int main (int argc, char** argv)
     virtual_obstacle_service = service_h.advertiseService("virtual_obstacle_cmd", Virtual_Obstacle_Command);
     //Set EKF & IMU Reset Service//
     set_ekf_service = service_h.advertiseService("set_ekf_cmd", SetEKF_Command);
+    //add.. Manual Backmove Service ... 240125//
+    manual_backmove_service = service_h.advertiseService("manual_backmove_cmd", Manual_Backmove_Command);
     
     //usb_cam Service Client...
     ros::NodeHandle client_h;
