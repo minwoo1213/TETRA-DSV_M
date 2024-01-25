@@ -68,6 +68,8 @@
 #include "tetraDS_TCP/power_get_io_status.h" //SRV
 //add...230405_wbjin
 #include "tetraDS_TCP/power_set_single_outport.h" //SRV
+//add 240125 ... mwcha
+#include "tetraDS_TCP/manual_backmove.h" //SRV
 
 #define BUF_LEN 4096
 using namespace std;
@@ -141,6 +143,9 @@ tetraDS_TCP::power_get_io_status gpio_status_cmd_service;
 //add_230405
 ros::ServiceClient single_output_cmd_client;
 tetraDS_TCP::power_set_single_outport single_output_cmd_service;
+//add... 240125
+ros::ServiceClient manual_backmove_cmd_client;
+tetraDS_TCP::manual_backmove manual_backmove_cmd_service;
 
 
 //***************************************************************************************************************************************/
@@ -504,6 +509,20 @@ bool Set_Output(int Output0, int Output1, int Output2, int Output3, int Output4,
 
 }
 
+//add_240125
+bool Manual_Movement(double cmd_vel_x, double Target_distance)
+{
+    bool bResult = false;
+    
+    manual_backmove_cmd_service.request.cmd_vel = cmd_vel_x;
+    manual_backmove_cmd_service.request.move_distance = Target_distance;
+    manual_backmove_cmd_client.call(manual_backmove_cmd_service);
+
+    bResult = true;
+    return bResult;
+
+}
+
 //add_230405_wbjin
 bool Set_Single_Output(int Output_id, int iValue)
 {
@@ -694,6 +713,10 @@ bool DoParsing(char* data)
             case HashCode("LDL"): // delete to Location data ... 231120 mwcha
                 Delete_Location(m_cPARAM[0]);
                 break;
+            case HashCode("MM"): // back Move ... 240125 mwcha
+                //printf("cmd_vel = %.3f, distance = %.3f \n", atof(m_cPARAM[0]), atof(m_cPARAM[1]));
+                Manual_Movement(atof(m_cPARAM[0]), atof(m_cPARAM[1]));
+                break;
             case HashCode("MDL"): // delete to Map data ... 231120 mwcha
                 Delete_Map(m_cPARAM[0]);
                 break;
@@ -834,6 +857,8 @@ int main(int argc, char* argv[])
     //add
     single_output_cmd_client = client_h.serviceClient<tetraDS_TCP::power_set_single_outport>("Power_single_outport_cmd");
 
+    manual_backmove_cmd_client = client_h.serviceClient<tetraDS_TCP::manual_backmove>("manual_backmove_cmd"); // 240125
+    
     //***************************************************************************************************************************************/
     //TCP/IP Socket Loop...///
     if(argc != 2)
