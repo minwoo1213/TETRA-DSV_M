@@ -62,6 +62,7 @@ add_service_files(
   sethome_id.srv
   setekf.srv
   power_sonar_cmd.srv
+  manual_backmove.srv
 )
 
 generate_messages(   
