@@ -1979,8 +1979,16 @@ bool Manual_Backmove_Command(tetraDS_service::manual_backmove::Request &req,
     _pRobot_Status.m_cmd_vel = req.cmd_vel;
     _pRobot_Status.m_backmove_cmd = req.move_distance;
     _pRobot_Status.m_dGoal_Distance = _pRobot_Status.m_backmove_cmd + _pRobot_Status.m_dTotal_Distance;
-    ex_iDocking_CommandMode = 200;
-
+	
+    if(_pRobot_Status.m_cmd_vel == 0)
+    {
+	ex_iDocking_CommandMode = 0;
+    }
+    else
+    {
+	ex_iDocking_CommandMode = 200;
+    }
+	
 	bResult = true;
 	res.command_Result = bResult;
 	return true;
