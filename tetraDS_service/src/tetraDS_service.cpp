@@ -1,5 +1,5 @@
 ////TETRA_DS Service ROS Package_Ver 0.1
-// NEW _ M model of TETRA-DSV Version_240125 mwcha  //
+// NEW _ M model of TETRA-DSV Version_240129 mwcha  //
 #include <ros/ros.h>
 #include <ros/master.h> // add_move_base die check
 #include <ros/this_node.h> // add_move_base die check
@@ -29,6 +29,7 @@
 #include <std_msgs/Empty.h>
 #include <std_msgs/Header.h>
 #include <std_srvs/Empty.h>
+#include <std_srvs/SetBool.h> //add ... cygbot Local costmap toggle_enabled
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/PointCloud2.h> //bumper
 #include <sensor_msgs/Joy.h> //add 
@@ -231,6 +232,8 @@ typedef struct FALG_VALUE
     //PCL obstacle Check//
     bool m_bFlag_Obstacle_PCL1 = false;
     bool m_bFlag_Obstacle_PCL2 = false;
+    //Cygbot Check// add 240129 mwcha
+    bool m_bFlag_Obstacle_cygbot = false;
     //Error Flag//
     bool m_bumperhit_flag = false;
     bool m_emgpush_flag = false;
@@ -337,7 +340,12 @@ typedef struct ROBOT_STATUS
     int m_iConveyor_Sensor_info = 0;
     int HOME_ID = 0; //Docking ID Param Read//
     int CONVEYOR_ID = 0;
-    int CONVEYOR_MOVEMENT = 0; // 0: nomal , 1: Loading , 2: Unloading
+    int CONVEYOR_MOVEMENT = 0; // 0: nomal , 1: Loading , 2: Unloading\
+    //add..Total Distance ... 240129 mwcha
+    double m_cmd_vel = 0.0;
+    double m_backmove_cmd = 0.0;
+    double m_dTotal_Distance = 0.0;
+    double m_dGoal_Distance = 0.0;
 
 }ROBOT_STATUS;
 ROBOT_STATUS _pRobot_Status;
@@ -542,7 +550,9 @@ ros::ServiceClient clear_costmap_client;
 ros::ServiceClient SetPose_cmd_client;
 tetraDS_service::SetPose setpose_srv;
 geometry_msgs::PoseWithCovarianceStamped set_pose;
-
+//local_costmap toggle_enabled Service Client// add 240129 mwcha
+ros::ServiceClient toggle_enabled_client;
+std_srvs::SetBool toggle_enabled;
 //sonar sensor
 ros::ServiceClient power_sonar_cmd_client;
 tetraDS_service::power_sonar_cmd Power_sonar_srv;
@@ -582,6 +592,10 @@ tetraDS_service::pose_velocity_reset pose_velocity_reset_srv;
 ros::ServiceClient reboot_sensor_cmd_client;
 tetraDS_service::reboot_sensor reboot_sensor_srv;
 
+//************************************************************************************************************************//
+//Cygbot local costmap toggle_enabled flag// 240129 mwcha add
+bool m_bToggle_enabled_flag1 = false;
+bool m_bToggle_enabled_flag2 = false;
 //************************************************************************************************************************//
 
 void my_handler(sig_atomic_t s)
@@ -731,6 +745,33 @@ void PCL2_Callback(const sensor_msgs::LaserScan::ConstPtr &msg)
         _pFlag_Value.m_bFlag_Obstacle_PCL2 = true;
     else
         _pFlag_Value.m_bFlag_Obstacle_PCL2 = false;
+}
+
+void Cygbot_Callback(const sensor_msgs::LaserScan::ConstPtr &msg) // 240129 mwcha add
+{
+    int size = msg->ranges.size();
+    //printf("cygbot_size: %d \n",size);
+    int cygbot_minIndex = 1;
+    int cygbot_maxIndex = 160;
+    int cygbot_closestIndex = -1;
+    double cygbot_minVal = 0.5;
+    for (int i = cygbot_minIndex; i < cygbot_maxIndex; i++)
+    {
+        if ((msg->ranges[i] <= cygbot_minVal) && (msg->ranges[i] >= msg->range_min) && (msg->ranges[i] <= msg->range_max))
+        {
+            cygbot_minVal = msg->ranges[i];
+            cygbot_closestIndex = i;
+        }
+    }
+    //printf("cygbot_closestIndex: %d || check: %f \n" , cygbot_closestIndex, msg->ranges[cygbot_closestIndex]);
+    if(cygbot_closestIndex > 0)
+    {
+       _pFlag_Value.m_bFlag_Obstacle_cygbot = true;
+    }
+    else
+    {
+        _pFlag_Value.m_bFlag_Obstacle_cygbot = false;
+    }
 }
 
 double Quaternion2Yaw(double Quaternion_W, double Quaternion_X, double Quaternion_Y, double Quaternion_Z)
@@ -998,10 +1039,34 @@ bool Setspeed_Command(tetraDS_service::setmaxspeed::Request &req,
 	return true;
 }
 
-void cmd_vel_Callback(const geometry_msgs::Twist::ConstPtr& msg)
+void cmd_vel_Callback(const geometry_msgs::Twist::ConstPtr& msg) //adjust because tetraDS_M new version use cygbot lidar ... 240129 mwcha
 {
     _pDynamic_param.m_linear_vel  = msg->linear.x;
     _pDynamic_param.m_angular_vel = msg->angular.z;
+	
+    if(_pDynamic_param.m_linear_vel < 0)
+    {
+        if(!m_bToggle_enabled_flag1)
+        {
+            toggle_enabled.request.data = true;
+            toggle_enabled_client.call(toggle_enabled);
+            //printf("toggle_Enable !\n");
+            m_bToggle_enabled_flag1 = true;
+            m_bToggle_enabled_flag2 = false;
+        }
+        
+    }
+    else
+    {
+        if(!m_bToggle_enabled_flag2)
+        {
+            toggle_enabled.request.data = false;
+            toggle_enabled_client.call(toggle_enabled);
+            //printf("toggle_Disable !\n");
+            m_bToggle_enabled_flag1 = false;
+            m_bToggle_enabled_flag2 = true;
+        }
+    }
 
 }
 
@@ -1278,7 +1343,7 @@ bool Depart_Station2Move()
     
     if(_pAR_tag_pose.m_transform_pose_x <= 0.7) //700mm depart move
     {
-        if(_pFlag_Value.m_bFlag_Obstacle_Center)
+         if(_pFlag_Value.m_bFlag_Obstacle_cygbot) // if(_pFlag_Value.m_bFlag_Obstacle_cygbot)
         {
             cmd->linear.x =  0.0; 
             cmd->angular.z = 0.0;
@@ -1287,7 +1352,7 @@ bool Depart_Station2Move()
         }
         else
         {
-            cmd->linear.x =  0.05; 
+            cmd->linear.x =  -0.05; //0.05 ... 230707 mwcha
             cmd->angular.z = 0.0;
             cmdpub_.publish(cmd);
             bResult = false;
@@ -1302,9 +1367,11 @@ bool Depart_Station2Move()
 
         //add goto cmd call//
         setGoal(goal);
+        
+        ex_iDocking_CommandMode = 0;
 
         bResult = true;
-        ex_iDocking_CommandMode = 0;
+        
     }
     
     return bResult;
@@ -2430,6 +2497,12 @@ void SensorCallback(const std_msgs::Int32::ConstPtr& msg)
     _pRobot_Status.m_iConveyor_Sensor_info = msg->data;
 }
 
+//add.. Total Distance Callback ... 240129 mwcha
+void TotalDistance_Callback(const std_msgs::Float32::ConstPtr& msg)
+{
+    _pRobot_Status.m_dTotal_Distance = msg->data;
+}
+
 /////////LanMark file Write & Read Fuction///////////
 bool SaveLandMark(LANDMARK_POSE p)
 {
@@ -2888,7 +2961,20 @@ bool BumperCollision_Behavior()
     }
     else
     {
-        if((m_Ultrasonic_RL_Range <= 0.2) || (m_Ultrasonic_RR_Range <= 0.2))
+        // if((m_Ultrasonic_RL_Range <= 0.2) || (m_Ultrasonic_RR_Range <= 0.2))
+        // {
+        //     cmd->linear.x =  0.0; 
+        //     cmd->angular.z = 0.0;
+        //     cmdpub_.publish(cmd);
+        // }
+        // else
+        // {
+        //     cmd->linear.x =  -0.02; 
+        //     cmd->angular.z = 0.0;
+        //     cmdpub_.publish(cmd);
+        //     _pRobot_Status.m_iBumperCollisionBehavor_cnt++;
+        // } 
+        if(_pFlag_Value.m_bFlag_Obstacle_cygbot)
         {
             cmd->linear.x =  0.0; 
             cmd->angular.z = 0.0;
@@ -3720,7 +3806,64 @@ bool DeleteData_All_Command(tetraDS_service::deletedataall::Request  &req,
     res.command_Result = bResult;
     return true;
 }
+void backmovement() // add 240129 mwcha
+{
+    geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
+    printf("Target Distance = %.3f \n", _pRobot_Status.m_dGoal_Distance);
+    printf("SUM = %.3f \n", _pRobot_Status.m_dTotal_Distance +_pRobot_Status.m_backmove_cmd);
+    printf("_pRobot_Status.m_dTotal_Distance = %.3f \n", _pRobot_Status.m_dTotal_Distance);
 
+    if(_pRobot_Status.m_dTotal_Distance < _pRobot_Status.m_dGoal_Distance)
+    {
+        if(_pRobot_Status.m_cmd_vel < 0) // - move
+        {
+            if(_pFlag_Value.m_bFlag_Obstacle_cygbot)
+            {
+                cmd->linear.x =  0.0; 
+                cmd->angular.z = 0.0;
+                cmdpub_.publish(cmd);
+                        
+            }
+            else
+            {
+                cmd->linear.x = _pRobot_Status.m_cmd_vel; 
+                cmd->angular.z = 0.0;
+                cmdpub_.publish(cmd);
+                        
+            }
+        }
+        else // + move
+        {
+            if(_pFlag_Value.m_bFlag_Obstacle_Center)
+            {
+                cmd->linear.x =  0.0; 
+                cmd->angular.z = 0.0;
+                cmdpub_.publish(cmd);
+                        
+            }
+            else
+            {
+                cmd->linear.x = _pRobot_Status.m_cmd_vel; 
+                cmd->angular.z = 0.0;
+                cmdpub_.publish(cmd);
+                        
+            }
+
+        }
+        printf("_pRobot_Status.m_cmd_vel; = %.3f \n", _pRobot_Status.m_cmd_vel);
+        cmd->linear.x = _pRobot_Status.m_cmd_vel; 
+        cmd->angular.z = 0.0;
+        cmdpub_.publish(cmd);  
+    }
+    else
+    {
+            cmd->linear.x =  0.0; 
+            cmd->angular.z = 0.0;
+            cmdpub_.publish(cmd);
+            ex_iDocking_CommandMode = 0;
+    }
+
+}
 void *DockingThread_function(void *data)
 {
     while(1)
@@ -4375,6 +4518,8 @@ int main (int argc, char** argv)
     //Depthimage to scan subscriber//
     ros::Subscriber pcl1_sub = nh.subscribe("pcl_1", 100, PCL1_Callback);
     ros::Subscriber pcl2_sub = nh.subscribe("pcl_2", 100, PCL2_Callback);
+    //Cygbot LiDAR to scan subscriber//
+    ros::Subscriber cygbot_sub = nh.subscribe("scan_laser", 100, Cygbot_Callback); //Rear Cygbot LiDAR ... 240129 mwcha
     //virtual costmap
     virtual_obstacle_pub = nh.advertise<virtual_costmap_layer::Obstacles>("virtual_costamp_layer/obsctacles", 100);
     virtual_obstacle2_pub = nh.advertise<virtual_costmap_layer2::Obstacles2>("virtual_costamp_layer2/obsctacles", 100);
@@ -4480,6 +4625,9 @@ int main (int argc, char** argv)
     euler_angle_reset_cmd_client = client_h.serviceClient<tetraDS_service::euler_angle_reset>("euler_angle_reset_cmd");
     //robot_localization Service Client//
     SetPose_cmd_client = client_h.serviceClient<tetraDS_service::SetPose>("set_pose");
+    //cygbot_mark toggle_enabled Service Client//
+    toggle_enabled_client = client_h.serviceClient<std_srvs::SetBool>("move_base/local_costmap/cygbot_obstacle_layer/cygbot_mark/toggle_enabled");
+    //Infomation_subscriber//
     //sonar sensor on/off
     power_sonar_cmd_client = client_h.serviceClient<tetraDS_service::power_sonar_cmd>("Power_sonar_start_cmd");
 
@@ -4492,6 +4640,9 @@ int main (int argc, char** argv)
     //Conveyor_Info Subscriber//
     ros::Subscriber loadcell_status = nInfo.subscribe<std_msgs::Float64>("conveyor_loadcell", 1, LoadcellCallback);
     ros::Subscriber sensor_status = nInfo.subscribe<std_msgs::Int32>("conveyor_sensor", 1, SensorCallback);
+    
+    //add..Total Distance sub ... 240129 mwcha
+    ros::Subscriber total_distance_sub = nInfo.subscribe<std_msgs::Float32>("total_distance", 10, TotalDistance_Callback);
 
     //Ultrasonic_subscriber//
     ros::Subscriber ultrasonic_FL = nInfo.subscribe<sensor_msgs::Range>("Ultrasonic_D_L", 10, Ultrasonic_DL_Callback);
