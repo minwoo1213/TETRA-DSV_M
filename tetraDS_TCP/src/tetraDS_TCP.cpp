@@ -57,7 +57,6 @@
 #include "tetraDS_TCP/setsavemap.h" //SRV
 #include "tetraDS_TCP/getlocationlist.h" //SRV
 #include "tetraDS_TCP/deletelocation.h" //SRV
-#include "tetraDS_TCP/deletemap.h" //SRV    
 #include "tetraDS_TCP/runmapping.h" //SRV
 #include "tetraDS_TCP/runnavigation.h" //SRV
 #include "tetraDS_TCP/rosnodekill.h" //SRV
@@ -68,7 +67,7 @@
 #include "tetraDS_TCP/power_get_io_status.h" //SRV
 //add...230405_wbjin
 #include "tetraDS_TCP/power_set_single_outport.h" //SRV
-//add 240125 ... mwcha
+//add...240205 mwcha
 #include "tetraDS_TCP/manual_backmove.h" //SRV
 
 #define BUF_LEN 4096
@@ -128,8 +127,6 @@ ros::ServiceClient mapping_cmd_client;
 tetraDS_TCP::runmapping mapping_cmd_service;
 ros::ServiceClient mapsave_cmd_client;
 tetraDS_TCP::setsavemap mapsave_cmd_service;
-ros::ServiceClient deletemap_cmd_client; //add 231120 mwcha
-tetraDS_TCP::deletemap deletemap_cmd_service; //add 231120 mwcha
 ros::ServiceClient nodekill_cmd_client;
 tetraDS_TCP::rosnodekill nodekill_cmd_service;
 ros::ServiceClient deletelocation_cmd_client;
@@ -143,7 +140,9 @@ tetraDS_TCP::power_get_io_status gpio_status_cmd_service;
 //add_230405
 ros::ServiceClient single_output_cmd_client;
 tetraDS_TCP::power_set_single_outport single_output_cmd_service;
-//add... 240125
+//add 230926
+ros::Publisher cmdpub_;
+//add 240205
 ros::ServiceClient manual_backmove_cmd_client;
 tetraDS_TCP::manual_backmove manual_backmove_cmd_service;
 
@@ -253,7 +252,6 @@ void resultCallback(const move_base_msgs::MoveBaseActionResult::ConstPtr& msgRes
     // curr_time = time(NULL);
     // curr_tm = localtime(&curr_time);
     _pRobot_Status.iMovebase_Result = msgResult->status.status;
-    printf("_pRobot_Status.iMovebase_Result : %d \n", _pRobot_Status.iMovebase_Result);
     ROS_INFO("[SUCCEEDED]resultCallback: %d ",msgResult->status.status);
    
 }
@@ -465,31 +463,6 @@ bool Set_Location(string strLocationName)
     return bResult;
 }
 
-bool Delete_Location(string strLocationName) //add by mwcha 231120
-{
-    bool bResult = false;
-
-    deletelocation_cmd_service.request.Location = strLocationName;
-    deletelocation_cmd_client.call(deletelocation_cmd_service);
-
-    sprintf(Send_buffer,"DS,2,LDL,%s,XX", strLocationName.c_str());
-
-    bResult = true;
-    return bResult;
-}
-bool Delete_Map(string strMapName) //add by mwcha 231120
-{
-    bool bResult = false;
-
-    deletemap_cmd_service.request.map_name = strMapName;
-    deletemap_cmd_client.call(deletemap_cmd_service);
-
-    sprintf(Send_buffer,"DS,2,MDL,%s,XX", strMapName.c_str());
-
-    bResult = true;
-    return bResult;
-}
-
 bool Set_Output(int Output0, int Output1, int Output2, int Output3, int Output4, int Output5, int Output6, int Output7)
 {
     bool bResult = false;
@@ -509,20 +482,6 @@ bool Set_Output(int Output0, int Output1, int Output2, int Output3, int Output4,
 
 }
 
-//add_240125
-bool Manual_Movement(double cmd_vel_x, double Target_distance)
-{
-    bool bResult = false;
-    
-    manual_backmove_cmd_service.request.cmd_vel = cmd_vel_x;
-    manual_backmove_cmd_service.request.move_distance = Target_distance;
-    manual_backmove_cmd_client.call(manual_backmove_cmd_service);
-
-    bResult = true;
-    return bResult;
-
-}
-
 //add_230405_wbjin
 bool Set_Single_Output(int Output_id, int iValue)
 {
@@ -531,6 +490,20 @@ bool Set_Single_Output(int Output_id, int iValue)
     single_output_cmd_service.request.ID = Output_id;
     single_output_cmd_service.request.VALUE = iValue;
     single_output_cmd_client.call(single_output_cmd_service);
+
+    bResult = true;
+    return bResult;
+
+}
+
+//add 240205
+bool Manual_Movement(double cmd_vel_x, double Target_distance)
+{
+    bool bResult = false;
+    
+    manual_backmove_cmd_service.request.cmd_vel = cmd_vel_x;
+    manual_backmove_cmd_service.request.move_distance = Target_distance;
+    manual_backmove_cmd_client.call(manual_backmove_cmd_service);
 
     bResult = true;
     return bResult;
@@ -573,7 +546,7 @@ bool NodeKill()
     nodekill_cmd_client.call(nodekill_cmd_service);
 
     bResult = true;
-    return bResult;   
+    return bResult;
 }
 
 bool Map_Save(string strMapName)
@@ -601,6 +574,18 @@ bool Dcoking_Control(int iMarkerID, int iMode)
     return bResult;
 }
 
+bool Set_JOG_command(double linear_vel, double angular_vel) //0926
+{
+    geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
+    bool bResult = false;
+
+    cmd->linear.x = linear_vel;
+    cmd->angular.z = angular_vel;
+    cmdpub_.publish(cmd);
+
+    bResult = true;
+    return bResult;
+}
 
 //***************************************************************************************************************************************/
 
@@ -687,10 +672,8 @@ bool DoParsing(char* data)
                 break;
             case HashCode("KILL"): //Mapping Mode or Navigation Mode Kill Service Call
                 NodeKill();
-                sprintf(Send_buffer, " MAPPING / NAV MODE EXIT "); //add by mwcha ... 231115
                 break;
             case HashCode("DOC"): // Docking command
-                _pRobot_Status.iMovebase_Result = 0;
                 Dcoking_Control(atoi(m_cPARAM[0]), atoi(m_cPARAM[1]));
                 break;
             case HashCode("GO1"): // Move to saved location 
@@ -710,15 +693,8 @@ bool DoParsing(char* data)
             case HashCode("LSV"): // Save to Location data
                 Set_Location(m_cPARAM[0]);
                 break;
-            case HashCode("LDL"): // delete to Location data ... 231120 mwcha
-                Delete_Location(m_cPARAM[0]);
-                break;
-            case HashCode("MM"): // back Move ... 240125 mwcha
-                //printf("cmd_vel = %.3f, distance = %.3f \n", atof(m_cPARAM[0]), atof(m_cPARAM[1]));
+            case HashCode("MM"): // backmove 240205
                 Manual_Movement(atof(m_cPARAM[0]), atof(m_cPARAM[1]));
-                break;
-            case HashCode("MDL"): // delete to Map data ... 231120 mwcha
-                Delete_Map(m_cPARAM[0]);
                 break;
             case HashCode("OUT"): // GPIO_Output command
                 Set_Output(atoi(m_cPARAM[0]),atoi(m_cPARAM[1]),atoi(m_cPARAM[2]),atoi(m_cPARAM[3]),
@@ -732,6 +708,8 @@ bool DoParsing(char* data)
                 break;
             case HashCode("DATA"): // AMCL Pose & Robot Status Data all...
                 GetDataAll();
+            case HashCode("JOG"): // JOG_CMD_230926
+                Set_JOG_command(atof(m_cPARAM[0]), atof(m_cPARAM[1]));      
                 break;
 
         }
@@ -835,6 +813,9 @@ int main(int argc, char* argv[])
     ros::NodeHandle nTest;
     ros::Subscriber Test_sub = nTest.subscribe("/rviz_visual_tools_gui", 10, TESTCallback);
 
+    //add_230926_mwcha
+    cmdpub_ = nh.advertise<geometry_msgs::Twist>("cmd_vel",100);
+
     ////tetraDS ServiceClient///////////////////////////////////////////////////////////////////////////////////
     ros::NodeHandle client_h;
     goto_cmd_client  = client_h.serviceClient<tetraDS_TCP::gotolocation>("goto_cmd");
@@ -850,15 +831,14 @@ int main(int argc, char* argv[])
     mapsave_cmd_client = client_h.serviceClient<tetraDS_TCP::setsavemap>("savemap_cmd");
     nodekill_cmd_client = client_h.serviceClient<tetraDS_TCP::rosnodekill>("nodekill_cmd");
     deletelocation_cmd_client = client_h.serviceClient<tetraDS_TCP::deletelocation>("delete_location_cmd");
-    deletemap_cmd_client = client_h.serviceClient<tetraDS_TCP::deletemap>("deletemap_cmd"); //add 231120 mwcha
     dockingcontrol_cmd_client = client_h.serviceClient<tetraDS_TCP::dockingcontrol>("docking_cmd");
     output_cmd_client = client_h.serviceClient<tetraDS_TCP::power_set_outport>("Power_outport_cmd");
     gpio_status_cmd_client = client_h.serviceClient<tetraDS_TCP::power_get_io_status>("Power_io_status_cmd");
     //add
     single_output_cmd_client = client_h.serviceClient<tetraDS_TCP::power_set_single_outport>("Power_single_outport_cmd");
+    //add 240205
+    manual_backmove_cmd_client = client_h.serviceClient<tetraDS_TCP::manual_backmove>("manual_backmove_cmd");
 
-    manual_backmove_cmd_client = client_h.serviceClient<tetraDS_TCP::manual_backmove>("manual_backmove_cmd"); // 240125
-    
     //***************************************************************************************************************************************/
     //TCP/IP Socket Loop...///
     if(argc != 2)
