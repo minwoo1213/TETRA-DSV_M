@@ -4872,7 +4872,7 @@ int main (int argc, char** argv)
                 if(bCheck_waitForTransform)
                 {
                     m_iList_Count = virtual_obstacle.list.size();
-                    if(m_iList_Count > 0)
+                    if(m_iList_Count > 0 || m_bFlag_virtualWallCheck)
                     {
                         if(m_bFlag_nomotion_call || !_pFlag_Value.m_bFlag_nomotion || m_flag_Dynamic_reconfigure_call || m_flag_setgoal || _pFlag_Value.m_bTebMarker_reconfigure_flag)
                         {
@@ -4884,7 +4884,7 @@ int main (int argc, char** argv)
                         virtual_obstacle2.list.clear();
                         virtual_obstacle2.list.resize(m_iList_Count);
                         m_iList_Count2 = virtual_obstacle2.list.size();
-                        if(m_iList_Count2 > 0)
+                        if(m_iList_Count2 >= 0)
                         {
                             for(int i=0; i<m_iList_Count2; i++)
                             {
@@ -4913,7 +4913,7 @@ int main (int argc, char** argv)
                                 m_bFlag_virtualWallCheck = false;
                             }
 
-                    }
+                    	}
                 }
                 else
                 {
