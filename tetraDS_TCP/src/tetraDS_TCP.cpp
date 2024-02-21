@@ -708,6 +708,7 @@ bool DoParsing(char* data)
                 break;
             case HashCode("DATA"): // AMCL Pose & Robot Status Data all...
                 GetDataAll();
+                break;
             case HashCode("JOG"): // JOG_CMD_230926
                 Set_JOG_command(atof(m_cPARAM[0]), atof(m_cPARAM[1]));      
                 break;
