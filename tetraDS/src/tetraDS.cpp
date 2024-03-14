@@ -672,7 +672,7 @@ int main(int argc, char * argv[])
 		{
 			printf("[Motor Driver Error] Left Error Code: %d \n", m_left_error_code);
 			printf("[Motor Driver Error] Right Error Code: %d \n", m_right_error_code);
-			dssp_rs232_drv_module_set_drive_err_reset();
+			//dssp_rs232_drv_module_set_drive_err_reset(); 240314 update
 			usleep(1000);
 			dssp_rs232_drv_module_set_servo(1); //Servo On
 		}
