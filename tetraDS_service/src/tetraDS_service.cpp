@@ -1,5 +1,5 @@
-////TETRA_DS Service ROS Package_Ver 0.1
-// NEW _ M model of TETRA-DSV Version_240129 mwcha  //
+// TETRA_DS Service ROS Package //
+// NEW _ M model of TETRA-DSV Version_240315 mwcha  //
 #include <ros/ros.h>
 #include <ros/master.h> // add_move_base die check
 #include <ros/this_node.h> // add_move_base die check
@@ -1336,44 +1336,58 @@ bool GetLocation_Command(tetraDS_service::getlocation::Request  &req,
 	return true;
 }
 
-bool Depart_Station2Move()
+bool Depart_Station2Move(int marker_id)
 {
     bool bResult = false;
+    printf("Depart_station2Move ... docking exit!! \n"); //240315 mwcha made new func
+
+    float m_fdistance = 0.0;
     geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
-    
-    if(_pAR_tag_pose.m_transform_pose_x <= 0.7) //700mm depart move
+    if(_pAR_tag_pose.m_iAR_tag_id == marker_id)
     {
-         if(_pFlag_Value.m_bFlag_Obstacle_cygbot) // if(_pFlag_Value.m_bFlag_Obstacle_cygbot)
+        m_fdistance = sqrt(_pAR_tag_pose.m_transform_pose_x * _pAR_tag_pose.m_transform_pose_x + _pAR_tag_pose.m_transform_pose_y * _pAR_tag_pose.m_transform_pose_y);
+        printf("Depart_fdistance: %.5f \n", m_fdistance);
+        if(m_fdistance < 0.3 && _pRobot_Status.m_iCallback_Charging_status < 2)
         {
-            cmd->linear.x =  0.0; 
-            cmd->angular.z = 0.0;
-            cmdpub_.publish(cmd);
-            bResult = false;
+            printf("Cant move because robot has docked but docking_station doesn`t work !! \n");
+            cmd->linear.x = 0.0;           
         }
         else
         {
-            cmd->linear.x =  -0.05; //0.05 ... 230707 mwcha
-            cmd->angular.z = 0.0;
-            cmdpub_.publish(cmd);
-            bResult = false;
+            if(_pAR_tag_pose.m_transform_pose_x <= 0.6) //600mm depart move
+            {
+                if(_pFlag_Value.m_bFlag_Obstacle_cygbot)
+                {
+                    cmd->linear.x =  0.0; 
+                    cmd->angular.z = 0.0;
+                    cmdpub_.publish(cmd);
+                    bResult = false;
+                }
+                else
+                {
+                    cmd->linear.x =  -0.05; 
+                    cmd->angular.z = 0.0;
+                    cmdpub_.publish(cmd);
+                    bResult = false;
+                }    
+            }
+            else
+            {
+                cmd->linear.x =  0.0; 
+                cmd->angular.z = 0.0;
+                cmdpub_.publish(cmd);
+
+                //add goto cmd call//
+                setGoal(goal);
+
+                ex_iDocking_CommandMode = 0;
+
+                bResult = true;
+            }
         }
-            
     }
-    else
-    {
-        cmd->linear.x =  0.0; 
-        cmd->angular.z = 0.0;
-        cmdpub_.publish(cmd);
 
-        //add goto cmd call//
-        setGoal(goal);
-        
-        ex_iDocking_CommandMode = 0;
-
-        bResult = true;
-        
-    }
-    
+    cmdpub_.publish(cmd);
     return bResult;
 }
 
@@ -3952,7 +3966,7 @@ void *DockingThread_function(void *data)
                 break;
             case 10:
                 Sonar_On(1); //add_sonar_on/off
-                Depart_Station2Move();
+                Depart_Station2Move(_pAR_tag_pose.m_iSelect_AR_tag_id);
                 break;
             /****************************************************************/
             // Conveyor Docking Loop//
@@ -4794,6 +4808,9 @@ int main (int argc, char** argv)
         {
             if(_pRobot_Status.m_iCallback_Charging_status == 2 || _pRobot_Status.m_iCallback_Charging_status == 3 || _pRobot_Status.m_iCallback_Charging_status == 6 || _pRobot_Status.m_iCallback_Charging_status == 7)
             {
+                //todo.. 240315
+                LED_Toggle_Control(1, 3,100,3,100); //(int de_index, int light_acc, int High_brightness, int light_dec, int Low_brightness)
+                LED_Turn_On(63); //White led
                 m_iTimer_cnt ++;
             }
             else
